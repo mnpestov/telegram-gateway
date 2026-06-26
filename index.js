@@ -51,7 +51,7 @@ function logTgResponse(ctx, extra = {}) {
 }
 
 function logError(ctx, startTime, err) {
-  logEvent({ event: 'ERROR', ...ctx, errorName: err.name, errorMessage: err.message, totalDurationMs: Date.now() - startTime });
+  logEvent({ event: 'ERROR', ...ctx, errorName: err.name, errorMessage: err.message, stack: err.stack ?? null, totalDurationMs: Date.now() - startTime });
 }
 
 // Returns false and sends 403 if the API key is missing or wrong.
