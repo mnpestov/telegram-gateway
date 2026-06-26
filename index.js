@@ -121,28 +121,64 @@ app.post('/check-subscription', async (req, res) => {
       `?chat_id=${encodeURIComponent(CHANNEL_ID)}` +
       `&user_id=${encodeURIComponent(userId)}`;
 
+    // ── First attempt ──────────────────────────────────────────────────────────
+
     logTgStarted(ctx, { telegramMethod: 'getChatMember', userId: userId ?? null, chatId: CHANNEL_ID });
 
-    const tgStart = Date.now();
-    const response = await fetch(url);
-    const data = await response.json();
-    const telegramDurationMs = Date.now() - tgStart;
+    const tgStart1 = Date.now();
+    let response = await fetch(url);
+    let data = await response.json();
+    let telegramDurationMs = Date.now() - tgStart1;
+
+    logTgResponse(ctx, {
+      telegramMethod: 'getChatMember',
+      httpStatus: response.status,
+      telegramOk: data.ok ?? null,
+      telegramStatus: data?.result?.status ?? null,
+      telegramDurationMs,
+      userId: userId ?? null,
+      ...tgErrorFields(data),
+    });
+
+    // ── Retry on PARTICIPANT_ID_INVALID ────────────────────────────────────────
+
+    if (response.status === 400 && data?.description === 'Bad Request: PARTICIPANT_ID_INVALID') {
+      logEvent({
+        event: 'TG_RETRY_SCHEDULED',
+        ...ctx,
+        telegramMethod: 'getChatMember',
+        userId: userId ?? null,
+        retryReason: 'PARTICIPANT_ID_INVALID',
+        delayMs: 2000,
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      logTgStarted(ctx, { telegramMethod: 'getChatMember', userId: userId ?? null, chatId: CHANNEL_ID });
+
+      const tgStart2 = Date.now();
+      response = await fetch(url);
+      data = await response.json();
+      telegramDurationMs = Date.now() - tgStart2;
+
+      logTgResponse(ctx, {
+        telegramMethod: 'getChatMember',
+        httpStatus: response.status,
+        telegramOk: data.ok ?? null,
+        telegramStatus: data?.result?.status ?? null,
+        telegramDurationMs,
+        userId: userId ?? null,
+        ...tgErrorFields(data),
+      });
+    }
+
+    // ── Decision (uses whichever attempt was last) ─────────────────────────────
 
     const status = data?.result?.status;
     const isSubscriber =
       status === 'creator' ||
       status === 'administrator' ||
       status === 'member';
-
-    logTgResponse(ctx, {
-      telegramMethod: 'getChatMember',
-      httpStatus: response.status,
-      telegramOk: data.ok ?? null,
-      telegramStatus: status ?? null,
-      telegramDurationMs,
-      userId: userId ?? null,
-      ...tgErrorFields(data),
-    });
 
     logEvent({
       event: 'SUBSCRIPTION_DECISION',
