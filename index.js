@@ -422,6 +422,30 @@ app.post('/send-message', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Bot API transparent proxy
+// grammY constructs: {apiRoot}/bot{token}/{method}
+// This proxy forwards those calls to api.telegram.org
+// ---------------------------------------------------------------------------
+
+app.all('/bot:token/:method', async (req, res) => {
+  const { token, method } = req.params;
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const targetUrl = `https://api.telegram.org/bot${token}/${method}${qs ? '?' + qs : ''}`;
+    const options = { method: req.method };
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      options.body = JSON.stringify(req.body);
+      options.headers = { 'Content-Type': 'application/json' };
+    }
+    const tgResponse = await fetch(targetUrl, options);
+    const data = await tgResponse.json();
+    res.status(tgResponse.status).json(data);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
 
