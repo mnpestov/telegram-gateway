@@ -426,10 +426,9 @@ app.post('/send-message', async (req, res) => {
 // Telegram file URLs: https://api.telegram.org/file/bot{token}/{path}
 // ---------------------------------------------------------------------------
 
-app.get('/file/bot:token/*', async (req, res) => {
-  const { token } = req.params;
-  const filePath = req.params[0];
-  const { ctx, startTime } = initRequest(req, res, '/file/bot:token/*');
+app.get('/file/bot:token/*filePath', async (req, res) => {
+  const { token, filePath } = req.params;
+  const { ctx, startTime } = initRequest(req, res, '/file/bot:token/*filePath');
 
   try {
     logTgStarted(ctx, { telegramMethod: 'downloadFile', filePath });
