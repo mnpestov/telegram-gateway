@@ -427,7 +427,8 @@ app.post('/send-message', async (req, res) => {
 // ---------------------------------------------------------------------------
 
 app.get('/file/bot:token/*filePath', async (req, res) => {
-  const { token, filePath } = req.params;
+  const { token } = req.params;
+  const filePath = [].concat(req.params.filePath).join('/');
   const { ctx, startTime } = initRequest(req, res, '/file/bot:token/*filePath');
 
   try {
