@@ -422,6 +422,44 @@ app.post('/send-message', async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// File download proxy
+// Telegram file URLs: https://api.telegram.org/file/bot{token}/{path}
+// ---------------------------------------------------------------------------
+
+app.get('/file/bot:token/*', async (req, res) => {
+  const { token } = req.params;
+  const filePath = req.params[0];
+  const { ctx, startTime } = initRequest(req, res, '/file/bot:token/*');
+
+  try {
+    logTgStarted(ctx, { telegramMethod: 'downloadFile', filePath });
+
+    const tgStart = Date.now();
+    const tgResponse = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`);
+    const telegramDurationMs = Date.now() - tgStart;
+
+    if (!tgResponse.ok) {
+      logTgResponse(ctx, { telegramMethod: 'downloadFile', httpStatus: tgResponse.status, telegramDurationMs });
+      logResponseSent(ctx, startTime, 502);
+      return res.status(502).end();
+    }
+
+    const buffer = Buffer.from(await tgResponse.arrayBuffer());
+    const contentType = tgResponse.headers.get('content-type') || 'application/octet-stream';
+
+    logTgResponse(ctx, { telegramMethod: 'downloadFile', httpStatus: tgResponse.status, contentType, byteSize: buffer.byteLength, telegramDurationMs });
+    logResponseSent(ctx, startTime, 200, { contentType, byteSize: buffer.byteLength });
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.end(buffer);
+  } catch (err) {
+    logError(ctx, startTime, err);
+    res.status(500).end();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Bot API transparent proxy
 // grammY constructs: {apiRoot}/bot{token}/{method}
 // This proxy forwards those calls to api.telegram.org
